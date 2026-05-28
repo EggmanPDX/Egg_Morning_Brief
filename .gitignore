@@ -1,0 +1,26 @@
+# Secrets & credentials — never commit
+.env
+.env.local
+credentials.json
+token.json
+*.credentials.json
+
+# Developer context (per global rule)
+CLAUDE.md
+
+# Internal design docs saturated with client data — keep local, never push
+docs/morning-brief-build-spec.md
+docs/morning-briefing-spec.md
+
+# Runtime state & logs
+*.log
+run_log.json
+job_runs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.DS_Store
