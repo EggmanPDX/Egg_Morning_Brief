@@ -113,9 +113,12 @@ def update_gmail_digest_on_briefing_page(digest_text: str, run_timestamp: str):
     ]
 
     if heading_id:
-        # Heading blocks don't support children — append to page instead
-        # (Gmail Digest is always the last section so appending to page puts content right after heading)
-        notion.blocks.children.append(block_id=MORNING_BRIEFING_PAGE_ID, children=new_blocks)
+        # Insert right after the heading so the digest stays in its own section.
+        # (Other sections like Job Radar now follow it on the page, so appending to
+        # the page end would misplace the content and let it be clobbered.)
+        notion.blocks.children.append(
+            block_id=MORNING_BRIEFING_PAGE_ID, children=new_blocks, after=heading_id
+        )
     else:
         # Section missing — append heading + content to end of page
         notion.blocks.children.append(
