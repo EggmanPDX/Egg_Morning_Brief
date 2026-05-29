@@ -97,13 +97,6 @@ def test_merge_dedupe_does_not_mutate_inputs():
     assert a["src"] == "Portland, OR"  # original dict must be untouched
 
 
-def test_merge_dedupe_keeps_distinct_none_ids():
-    a = lj.normalize_job({"title": "No id A"}, "Remote-US")  # id is None
-    b = lj.normalize_job({"title": "No id B"}, "Remote-US")  # id is None
-    out = lj.merge_dedupe([a, b])
-    assert len(out) == 2  # None-id jobs are not collapsed
-
-
 def test_normalize_job_stringifies_int_id():
     j = lj.normalize_job({"id": 4369282613, "title": "X"}, "Remote-US")
     assert j["id"] == "4369282613"

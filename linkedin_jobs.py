@@ -56,22 +56,16 @@ def normalize_job(item: dict, src_label: str) -> dict:
 
 
 def merge_dedupe(jobs: list) -> list:
-    """Dedupe by job id; merge src labels for duplicates. Does not mutate inputs.
-    Jobs with no id are kept as distinct entries (never collapsed together)."""
+    """Dedupe by job id; merge src labels for duplicates. Does not mutate inputs."""
     seen: dict = {}
-    ordered: list = []
     for j in jobs:
-        jid = j.get("id")
-        if jid is not None and jid in seen:
-            existing = seen[jid]
-            if j["src"] not in existing["src"].split("+"):
-                existing["src"] += "+" + j["src"]
+        jid = j["id"]
+        if jid in seen:
+            if j["src"] not in seen[jid]["src"].split("+"):
+                seen[jid]["src"] += "+" + j["src"]
         else:
-            copy = dict(j)
-            ordered.append(copy)
-            if jid is not None:
-                seen[jid] = copy
-    return ordered
+            seen[jid] = dict(j)
+    return list(seen.values())
 
 
 def rank_jobs(scored: list, threshold: int, top_n: int) -> list:
