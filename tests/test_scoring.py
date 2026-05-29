@@ -71,3 +71,12 @@ def test_parse_scoring_response_matches_int_vs_str_ids():
     out = ca.parse_scoring_response(text, jobs)
     assert out[0]["score"] == 80
     assert out[0]["reason"] == "good"
+
+
+def test_build_scoring_prompt_includes_source_signal():
+    # The authoritative remote/Portland signal (src) must reach the model.
+    jobs = [{"id": "1", "title": "Head of Sales Enablement", "company": "Cohere",
+             "location": "San Francisco, CA", "src": "Remote-US", "description": ""}]
+    prompt = ca.build_scoring_prompt(jobs, "profile")
+    assert "Remote-US" in prompt   # the per-job source value is shown
+    assert "source" in prompt      # the model is told the source field exists

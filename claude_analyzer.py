@@ -108,6 +108,7 @@ def build_scoring_prompt(jobs: list, profile: str) -> str:
             f'  title: {j.get("title")}\n'
             f'  company: {j.get("company")}\n'
             f'  location: {j.get("location")}\n'
+            f'  source: {j.get("src")}\n'
             f'  description: {desc}'
         )
     job_block = "\n".join(lines)
@@ -118,6 +119,11 @@ IDEAL ROLE PROFILE:
 
 Score each job 0-100 for fit against the profile (100 = perfect, 0 = irrelevant).
 Be strict: "AI-forward company" and training/enablement leadership are what matter.
+
+The `source` field is the AUTHORITATIVE location signal — it lists which LinkedIn searches
+matched the role: "Remote-US" means LinkedIn flagged it remote-eligible (US); "Portland, OR"
+means it matched the Portland-area search. Trust `source` over the `location` field for the
+profile's location weighting (a role may show a city but still be Remote-US).
 
 JOBS:
 {job_block}
