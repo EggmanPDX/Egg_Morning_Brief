@@ -106,3 +106,32 @@ def test_normalize_job_stringifies_int_id():
 def test_normalize_job_keeps_none_id_as_none():
     j = lj.normalize_job({"title": "no id"}, "Remote-US")
     assert j["id"] is None
+
+
+def test_collapse_duplicate_roles_same_company_title():
+    jobs = [
+        lj.normalize_job({"id": "1", "title": "(Remote) AI Enablement Lead", "companyName": "Harris Computer"}, "Remote-US"),
+        lj.normalize_job({"id": "2", "title": "(Remote) AI Enablement Lead", "companyName": "Harris Computer"}, "Remote-US"),
+        lj.normalize_job({"id": "3", "title": "Sales Enablement Manager", "companyName": "Drata"}, "Portland, OR"),
+    ]
+    out = lj.collapse_duplicate_roles(jobs)
+    assert len(out) == 2  # the duplicate Harris postings collapse to one
+
+
+def test_collapse_duplicate_roles_is_case_insensitive_and_merges_src():
+    jobs = [
+        lj.normalize_job({"id": "1", "title": "AI Enablement Lead", "companyName": "Acme AI"}, "Remote-US"),
+        lj.normalize_job({"id": "2", "title": "ai enablement lead", "companyName": "ACME AI"}, "Portland, OR"),
+    ]
+    out = lj.collapse_duplicate_roles(jobs)
+    assert len(out) == 1
+    assert out[0]["src"] == "Remote-US+Portland, OR"
+
+
+def test_collapse_duplicate_roles_keeps_distinct_titles_same_company():
+    jobs = [
+        lj.normalize_job({"id": "1", "title": "Enablement Manager", "companyName": "Drata"}, "Remote-US"),
+        lj.normalize_job({"id": "2", "title": "Technical Enablement Manager", "companyName": "Drata"}, "Remote-US"),
+    ]
+    out = lj.collapse_duplicate_roles(jobs)
+    assert len(out) == 2  # different titles at the same company stay separate

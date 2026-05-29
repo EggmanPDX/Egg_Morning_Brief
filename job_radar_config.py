@@ -24,5 +24,10 @@ AI-forward companies - orgs building AI products or aggressively adopting AI int
 Strong fit: "AI enablement", "GenAI training", enablement at an AI/ML company.
 Weak fit: generic sales enablement at a non-tech company, IC / coordinator roles,
 pure instructional-design with no strategy scope.
-Location: remote-US or Portland, OR. Full-time.
+
+LOCATION IS HEAVILY WEIGHTED. Strongly boost roles that are fully remote (US) or based in
+Portland, OR. Significantly downgrade roles that require on-site or hybrid presence outside
+Portland, even at AI-forward companies. Infer remote/Portland from the location field AND
+the title/description (look for "Remote", "Remote, US", "Portland", "work from anywhere"); a
+generic "United States" location paired with remote language counts as remote. Full-time only.
 """

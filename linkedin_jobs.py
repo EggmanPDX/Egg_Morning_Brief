@@ -68,6 +68,24 @@ def merge_dedupe(jobs: list) -> list:
     return list(seen.values())
 
 
+def collapse_duplicate_roles(jobs: list) -> list:
+    """Collapse postings of the same role (same company + title) listed under different
+    ids/locations — e.g. LinkedIn's per-state remote postings. Keeps the first, merges src."""
+    seen: dict = {}
+    out: list = []
+    for j in jobs:
+        key = (j["company"].strip().lower(), j["title"].strip().lower())
+        if key in seen:
+            kept = seen[key]
+            for s in j["src"].split("+"):
+                if s not in kept["src"].split("+"):
+                    kept["src"] += "+" + s
+        else:
+            seen[key] = j
+            out.append(j)
+    return out
+
+
 def rank_jobs(scored: list, threshold: int, top_n: int) -> list:
     """Keep score>=threshold, sort by score desc then posted_date desc, take top_n."""
     eligible = [j for j in scored if j.get("score", 0) >= threshold]
@@ -133,7 +151,7 @@ def search_jobs(token, actor, queries, locations, filters, limit, poll_timeout: 
             except Exception as e:
                 print(f"   ⚠️ Job Radar: search failed '{query}' @ {label}: {e}")
                 continue
-    return merge_dedupe(collected)
+    return collapse_duplicate_roles(merge_dedupe(collected))
 
 
 if __name__ == "__main__":
