@@ -1,4 +1,6 @@
 # notion_client.py
+import os
+from datetime import date
 from notion_client import Client
 from config import (
     NOTION_API_KEY,
@@ -207,6 +209,195 @@ def build_job_radar_blocks(ranked_jobs: list, run_timestamp: str) -> list:
             "bulleted_list_item": {"rich_text": rich},
         })
     return blocks
+
+
+# ── Newsletter Digest ───────────────────────────────────────────────────────
+
+NEWSLETTER_DIGEST_HEADING = "📰 Newsletter Digest"
+
+
+def build_newsletter_digest_blocks(newsletter_results: dict, run_timestamp: str) -> list:
+    """Build Notion blocks for the Newsletter Digest section."""
+    blocks = [
+        {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"type": "text", "text": {"content": f"Last updated: {run_timestamp}"}}],
+                "icon": {"emoji": "🕗"},
+                "color": "gray_background",
+            },
+        }
+    ]
+
+    for name, result in newsletter_results.items():
+        # Newsletter sub-heading
+        blocks.append({
+            "object": "block",
+            "type": "heading_3",
+            "heading_3": {
+                "rich_text": [{"type": "text", "text": {"content": name}}]
+            },
+        })
+
+        if result is None:
+            blocks.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"type": "text", "text": {"content": "No issue found in last 24h."}}]
+                },
+            })
+        else:
+            subject_line = f"{result.get('subject', '')}  ·  {result.get('sender', '')}"
+            blocks.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"type": "text", "text": {"content": subject_line},
+                                   "annotations": {"color": "gray"}}]
+                },
+            })
+            blocks.append({
+                "object": "block",
+                "type": "paragraph",
+                "paragraph": {
+                    "rich_text": [{"type": "text", "text": {"content": result.get("summary", "")}}]
+                },
+            })
+
+    return blocks
+
+
+def update_newsletter_digest_on_briefing_page(newsletter_results: dict, run_timestamp: str):
+    """
+    Replace the Newsletter Digest section on the Morning Briefing page.
+    Creates the section if it doesn't exist.
+    """
+    try:
+        blocks = notion.blocks.children.list(block_id=MORNING_BRIEFING_PAGE_ID)
+        heading_id, old_content_ids = _find_section(blocks, NEWSLETTER_DIGEST_HEADING)
+
+        for block_id in old_content_ids:
+            try:
+                notion.blocks.delete(block_id=block_id)
+            except Exception:
+                pass
+
+        new_blocks = build_newsletter_digest_blocks(newsletter_results, run_timestamp)
+
+        if heading_id:
+            notion.blocks.children.append(
+                block_id=MORNING_BRIEFING_PAGE_ID, children=new_blocks, after=heading_id
+            )
+        else:
+            notion.blocks.children.append(
+                block_id=MORNING_BRIEFING_PAGE_ID,
+                children=[
+                    {"object": "block", "type": "divider", "divider": {}},
+                    {
+                        "object": "block",
+                        "type": "heading_2",
+                        "heading_2": {
+                            "rich_text": [{"type": "text", "text": {"content": NEWSLETTER_DIGEST_HEADING}}]
+                        },
+                    },
+                    *new_blocks,
+                ],
+            )
+    except Exception as e:
+        print(f"   ❌ Newsletter digest Notion error: {e}")
+
+
+# ── Date Header Update (FIX 3) ──────────────────────────────────────────────
+
+def update_morning_briefing_header(today_str: str | None = None):
+    """
+    Update the date line in the Morning Briefing page's top callout block.
+    Finds the first callout whose text starts with 📅 and replaces line 0.
+    Leaves all other lines (Active workstreams, Last session, etc.) untouched.
+    """
+    if today_str is None:
+        today_str = date.today().strftime("%A, %B %-d, %Y")
+
+    try:
+        blocks = notion.blocks.children.list(block_id=MORNING_BRIEFING_PAGE_ID)
+        for block in blocks.get("results", []):
+            if block.get("type") != "callout":
+                continue
+
+            rich_text = block["callout"].get("rich_text", [])
+            full_text = "".join(t.get("plain_text", "") for t in rich_text)
+
+            if not full_text.strip().startswith("📅"):
+                continue
+
+            lines = full_text.split("\n")
+            lines[0] = f"📅 **{today_str}**"
+            new_text = "\n".join(lines)
+
+            notion.blocks.update(
+                block_id=block["id"],
+                callout={
+                    "rich_text": [{"type": "text", "text": {"content": new_text}}],
+                    "icon": block["callout"].get("icon", {"emoji": "📅"}),
+                    "color": block["callout"].get("color", "gray_background"),
+                },
+            )
+            print(f"   ✅ Date header updated: {today_str}")
+            return
+
+        print("   ⚠️  Date header callout (📅) not found on Morning Briefing page")
+    except Exception as e:
+        print(f"   ❌ Date header update error: {e}")
+
+
+# ── Session End Reminder (FIX 4A) ───────────────────────────────────────────
+
+HANDOFF_PATH = os.path.expanduser("~/Projects/Egg/Agentic_OS/memory/last_handoff.md")
+
+
+def check_and_append_session_end_reminder():
+    """
+    Check whether last_handoff.md was written today.
+    If not, prepend a warning callout to the Morning Briefing page.
+    """
+    reminder_needed = True
+
+    if os.path.exists(HANDOFF_PATH):
+        mtime = os.path.getmtime(HANDOFF_PATH)
+        if date.fromtimestamp(mtime) == date.today():
+            reminder_needed = False
+
+    if not reminder_needed:
+        return
+
+    try:
+        warning_block = {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [{
+                    "type": "text",
+                    "text": {
+                        "content": (
+                            "⚠️ Session end protocol not run yesterday — handoff is stale. "
+                            "Run 'session end' before closing today."
+                        )
+                    },
+                }],
+                "icon": {"emoji": "⚠️"},
+                "color": "yellow_background",
+            },
+        }
+        # Prepend to top of page (after title) so it's the first thing seen
+        notion.blocks.children.append(
+            block_id=MORNING_BRIEFING_PAGE_ID,
+            children=[warning_block],
+        )
+        print("   ⚠️  Session end reminder added to Morning Briefing (handoff is stale)")
+    except Exception as e:
+        print(f"   ❌ Session end reminder error: {e}")
 
 
 def update_job_radar_on_briefing_page(ranked_jobs: list, run_timestamp: str):

@@ -6,9 +6,16 @@ from datetime import datetime
 from pathlib import Path
 
 from config import GMAIL_ADDRESS, ANTHROPIC_API_KEY, NOTION_API_KEY
-from gmail_client import get_gmail_service, get_unread_emails_since, mark_as_read
-from claude_analyzer import analyze_email, generate_gmail_digest
-from notion_writer import create_d8_task, create_bgc_task, update_gmail_digest_on_briefing_page
+from gmail_client import get_gmail_service, get_unread_emails_since, mark_as_read, fetch_all_newsletters
+from claude_analyzer import analyze_email, generate_gmail_digest, summarize_newsletter
+from notion_writer import (
+    create_d8_task,
+    create_bgc_task,
+    update_gmail_digest_on_briefing_page,
+    update_newsletter_digest_on_briefing_page,
+    update_morning_briefing_header,
+    check_and_append_session_end_reminder,
+)
 
 RUN_LOG_PATH = Path(__file__).parent / "run_log.json"
 
@@ -116,7 +123,55 @@ def main():
     except Exception as e:
         print(f"   ❌ Job Radar error: {e}")
 
-    # 6. Update run log
+    # 8. Newsletter Digest — The Rundown, The Neuron, TLDR (FIX 2)
+    print("📰 Fetching newsletter digests...")
+    newsletter_results = {}
+    try:
+        if emails is not None:  # gmail_service available
+            raw_newsletters = fetch_all_newsletters(gmail_service)
+            # Summarize each found newsletter
+            for name, result in raw_newsletters.items():
+                if result:
+                    result["summary"] = summarize_newsletter(result)
+                newsletter_results[name] = result
+
+            update_newsletter_digest_on_briefing_page(newsletter_results, run_timestamp)
+            found_count = sum(1 for v in newsletter_results.values() if v)
+            print(f"   ✅ {found_count}/{len(newsletter_results)} newsletters found and written")
+        else:
+            print("   ⚠️  Gmail unavailable — newsletter digest skipped")
+    except Exception as e:
+        print(f"   ❌ Newsletter digest error: {e}")
+
+    run_log["newsletter_digest"] = {
+        name: ("found" if result else "not_found")
+        for name, result in newsletter_results.items()
+    }
+
+    # 9. Update date header (FIX 3)
+    print("📅 Updating date header...")
+    try:
+        update_morning_briefing_header()
+    except Exception as e:
+        print(f"   ❌ Date header error: {e}")
+
+    # 10. Session end reminder check (FIX 4A)
+    try:
+        check_and_append_session_end_reminder()
+    except Exception as e:
+        print(f"   ❌ Session end reminder check error: {e}")
+
+    # 11. Agentic_OS structure check (FIX 1 lock)
+    import os as _os
+    required_paths = [
+        _os.path.expanduser("~/Projects/Egg/Agentic_OS/CLAUDE.md"),
+        _os.path.expanduser("~/Projects/Egg/Agentic_OS/memory/last_handoff.md"),
+    ]
+    for path in required_paths:
+        if not _os.path.exists(path):
+            print(f"   ⚠️  WARNING: {path} missing from Agentic_OS — structure may be broken")
+
+    # 12. Update run log
     run_log["last_run"] = run_timestamp
     run_log["tasks_created"] = run_log.get("tasks_created", 0) + tasks_created
     run_log["emails_processed"] = run_log.get("emails_processed", 0) + len(emails)

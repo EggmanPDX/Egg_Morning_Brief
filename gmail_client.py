@@ -102,3 +102,68 @@ def mark_as_read(service, message_id):
         id=message_id,
         body={"removeLabelIds": ["UNREAD"]},
     ).execute()
+
+
+# ── Newsletter senders ──────────────────────────────────────────────────────
+# NOTE: Verify these against actual Gmail before trusting. These are best-
+# known sender addresses — run `fetch_newsletter` in dry-run mode once and
+# check the printed senders to confirm / correct.
+NEWSLETTER_SENDERS = {
+    "The Rundown": ["hi@therundown.ai", "newsletter@therundown.ai"],
+    "The Neuron": ["hello@theneurondaily.com", "hi@theneurondaily.com"],
+    "TLDR": ["dan@tldrnewsletter.com", "hello@tldr.tech"],
+}
+
+
+def fetch_newsletter(service, name: str, sender_patterns: list, lookback_hours: int = 24) -> dict | None:
+    """
+    Fetch the most recent newsletter from any of the given sender patterns
+    within the last lookback_hours. Returns a dict with {name, subject, date,
+    sender, body} or None if not found.
+    """
+    cutoff = datetime.utcnow() - timedelta(hours=lookback_hours)
+    cutoff_epoch = int(cutoff.timestamp())
+
+    for pattern in sender_patterns:
+        query = f"from:{pattern} after:{cutoff_epoch}"
+        try:
+            results = service.users().messages().list(
+                userId="me", q=query, maxResults=1
+            ).execute()
+            messages = results.get("messages", [])
+            if not messages:
+                continue
+
+            full_msg = service.users().messages().get(
+                userId="me", id=messages[0]["id"], format="full"
+            ).execute()
+
+            headers = {h["name"]: h["value"] for h in full_msg["payload"]["headers"]}
+            body = _extract_body(full_msg["payload"])
+
+            return {
+                "name": name,
+                "subject": headers.get("Subject", "(no subject)"),
+                "date": headers.get("Date", ""),
+                "sender": headers.get("From", pattern),
+                "body": body[:4000],  # cap for Claude
+            }
+        except Exception as e:
+            print(f"   ⚠️  Newsletter fetch error ({name} / {pattern}): {e}")
+            continue
+
+    return None
+
+
+def fetch_all_newsletters(service, lookback_hours: int = 24) -> dict:
+    """
+    Fetch the most recent issue of each configured newsletter.
+    Returns dict: {newsletter_name: result_dict_or_None}
+    """
+    results = {}
+    for name, patterns in NEWSLETTER_SENDERS.items():
+        result = fetch_newsletter(service, name, patterns, lookback_hours)
+        results[name] = result
+        status = f"✅ found ({result['sender']})" if result else "— not found"
+        print(f"   Newsletter {name}: {status}")
+    return results

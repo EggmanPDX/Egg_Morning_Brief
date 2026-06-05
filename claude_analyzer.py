@@ -95,6 +95,41 @@ def generate_gmail_digest(analyzed_emails: list) -> str:
     return "\n\n---\n\n".join(lines)
 
 
+def summarize_newsletter(newsletter: dict) -> str:
+    """
+    Summarize a newsletter email into 3 punchy bullets for the Morning Brief.
+    Returns a plain-text string (3 bullet lines) or an error note.
+    """
+    if not newsletter or not newsletter.get("body"):
+        return "No content available."
+
+    prompt = f"""You are summarizing a newsletter for Gregg Eiler's morning brief.
+Extract exactly 3 of the most important/interesting stories or insights from this issue.
+
+Newsletter: {newsletter['name']}
+Subject: {newsletter['subject']}
+
+Body:
+{newsletter['body']}
+
+Return ONLY 3 bullet points in this exact format (no preamble, no extra text):
+• [story or insight in ≤15 words]
+• [story or insight in ≤15 words]
+• [story or insight in ≤15 words]
+
+Be concrete. Name the actual topic, company, or finding. No vague summaries."""
+
+    try:
+        response = client.messages.create(
+            model=CLAUDE_MODEL,
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        return f"[Summary error: {e}]"
+
+
 DESC_TRUNCATE = 600
 
 
