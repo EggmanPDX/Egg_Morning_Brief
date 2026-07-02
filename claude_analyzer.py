@@ -200,10 +200,11 @@ def parse_scoring_response(text: str, jobs: list) -> list:
     return jobs
 
 
-def score_jobs(jobs: list, profile: str) -> list:
-    """Score all jobs in one batched Claude call. Degrades to score 0 on any error."""
-    if not jobs:
-        return []
+SCORING_BATCH_SIZE = 40  # keeps each call's output well under the token cap regardless of total job count
+
+
+def _score_batch(jobs: list, profile: str) -> list:
+    """Score a single batch of jobs in one Claude call. Degrades to score 0 on any error."""
     prompt = build_scoring_prompt(jobs, profile)
     try:
         response = client.messages.create(
@@ -216,3 +217,13 @@ def score_jobs(jobs: list, profile: str) -> list:
         print(f"   ⚠️ Job Radar: scoring call failed ({e}); defaulting to score 0")
         text = ""
     return parse_scoring_response(text, jobs)
+
+
+def score_jobs(jobs: list, profile: str) -> list:
+    """Score all jobs, batching so no single call's output risks truncation."""
+    if not jobs:
+        return []
+    scored = []
+    for i in range(0, len(jobs), SCORING_BATCH_SIZE):
+        scored.extend(_score_batch(jobs[i:i + SCORING_BATCH_SIZE], profile))
+    return scored

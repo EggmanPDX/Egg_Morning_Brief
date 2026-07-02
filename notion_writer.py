@@ -155,9 +155,11 @@ def update_gmail_digest_on_briefing_page(digest_text: str, run_timestamp: str):
 JOB_RADAR_HEADING = "💼 Job Radar"
 
 
-def _find_section(blocks, heading_text: str):
+def _find_section(blocks, heading_text: str, stop_types=("heading_1", "heading_2", "heading_3", "divider")):
     """Generic version of _find_gmail_digest_block: find a heading_2 by text and
-    return (heading_id, [content_block_ids]) up to the next heading/divider."""
+    return (heading_id, [content_block_ids]) up to the next block type in stop_types.
+    Sections that use heading_3 internally (e.g. Newsletter Digest) should pass a
+    stop_types that excludes heading_3, or old sub-sections never get deleted."""
     results = blocks.get("results", [])
     heading_id = None
     content_block_ids = []
@@ -165,7 +167,7 @@ def _find_section(blocks, heading_text: str):
     for block in results:
         if found:
             btype = block.get("type", "")
-            if btype in ["heading_1", "heading_2", "heading_3", "divider"]:
+            if btype in stop_types:
                 break
             content_block_ids.append(block["id"])
             continue
@@ -285,7 +287,9 @@ def update_newsletter_digest_on_briefing_page(newsletter_results: dict, run_time
     """
     try:
         blocks = notion.blocks.children.list(block_id=MORNING_BRIEFING_PAGE_ID)
-        heading_id, old_content_ids = _find_section(blocks, NEWSLETTER_DIGEST_HEADING)
+        heading_id, old_content_ids = _find_section(
+            blocks, NEWSLETTER_DIGEST_HEADING, stop_types=("heading_1", "heading_2", "divider")
+        )
 
         for block_id in old_content_ids:
             try:

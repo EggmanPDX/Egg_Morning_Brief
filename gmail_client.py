@@ -110,9 +110,10 @@ def mark_as_read(service, message_id):
 # known sender addresses — run `fetch_newsletter` in dry-run mode once and
 # check the printed senders to confirm / correct.
 NEWSLETTER_SENDERS = {
-    "The Rundown": ["hi@therundown.ai", "newsletter@therundown.ai"],
-    "The Neuron": ["hello@theneurondaily.com", "hi@theneurondaily.com"],
+    "The Rundown": ["news@daily.therundown.ai"],
+    "The Neuron": ["theneuron@newsletter.theneurondaily.com"],
     "TLDR": ["dan@tldrnewsletter.com", "hello@tldr.tech"],
+    "The Code": ["superhumancode@news.codenewsletter.ai"],
 }
 
 
