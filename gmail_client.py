@@ -112,7 +112,6 @@ def mark_as_read(service, message_id):
 NEWSLETTER_SENDERS = {
     "The Rundown": ["news@daily.therundown.ai"],
     "The Neuron": ["theneuron@newsletter.theneurondaily.com"],
-    "TLDR": ["dan@tldrnewsletter.com", "hello@tldr.tech"],
     "The Code": ["superhumancode@news.codenewsletter.ai"],
 }
 
@@ -148,7 +147,7 @@ def fetch_newsletter(service, name: str, sender_patterns: list, lookback_hours: 
                 "subject": headers.get("Subject", "(no subject)"),
                 "date": headers.get("Date", ""),
                 "sender": headers.get("From", pattern),
-                "body": body[:4000],  # cap for Claude
+                "body": body[:10000],  # cap for Claude — raised from 4000 so multi-story issues aren't cut off
             }
         except Exception as e:
             print(f"   ⚠️  Newsletter fetch error ({name} / {pattern}): {e}")
