@@ -1,4 +1,5 @@
 # notion_client.py
+from __future__ import annotations
 import os
 from datetime import date
 from notion_client import Client
@@ -13,6 +14,14 @@ notion = Client(auth=NOTION_API_KEY)
 
 # Heading text to find the Gmail Digest section on the Morning Briefing page
 GMAIL_DIGEST_HEADING = "📬 Gmail Digest"
+
+NOTION_RICH_TEXT_LIMIT = 2000
+
+
+def _chunked_rich_text(text: str) -> list:
+    """Split text into rich_text objects respecting Notion's 2000-char-per-item limit."""
+    chunks = [text[i:i + NOTION_RICH_TEXT_LIMIT] for i in range(0, len(text), NOTION_RICH_TEXT_LIMIT)]
+    return [{"type": "text", "text": {"content": c}} for c in chunks] or [{"type": "text", "text": {"content": ""}}]
 
 
 def create_d8_task(task_name: str, priority: str, project_area: str, source_context: str = "") -> str:
@@ -109,7 +118,7 @@ def update_gmail_digest_on_briefing_page(digest_text: str, run_timestamp: str):
             "object": "block",
             "type": "paragraph",
             "paragraph": {
-                "rich_text": [{"type": "text", "text": {"content": digest_text}}]
+                "rich_text": _chunked_rich_text(digest_text)
             },
         },
     ]

@@ -6,6 +6,14 @@ from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, BUSINESS_CONTEXT
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 
+def _response_text(response) -> str:
+    """Return the first text block's content, skipping any leading thinking blocks."""
+    for block in response.content:
+        if block.type == "text":
+            return block.text
+    raise ValueError("No text block in response")
+
+
 def analyze_email(email: dict) -> dict:
     """
     Send an email to Claude for analysis.
@@ -58,10 +66,10 @@ Return ONLY the JSON object. No preamble, no explanation."""
     )
 
     try:
-        text = response.content[0].text.strip()
+        text = _response_text(response).strip()
         text = text.replace("```json", "").replace("```", "").strip()
         return json.loads(text)
-    except (json.JSONDecodeError, IndexError):
+    except (json.JSONDecodeError, IndexError, ValueError):
         return {
             "has_action_item": False,
             "action_items": [],
@@ -125,7 +133,7 @@ Be concrete. Name the actual topic, company, or finding. No vague summaries."""
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}],
         )
-        return response.content[0].text.strip()
+        return _response_text(response).strip()
     except Exception as e:
         return f"[Summary error: {e}]"
 
@@ -203,7 +211,7 @@ def score_jobs(jobs: list, profile: str) -> list:
             max_tokens=8000,
             messages=[{"role": "user", "content": prompt}],
         )
-        text = response.content[0].text.strip()
+        text = _response_text(response).strip()
     except Exception as e:
         print(f"   ⚠️ Job Radar: scoring call failed ({e}); defaulting to score 0")
         text = ""

@@ -6,7 +6,7 @@ load_dotenv()
 
 # Anthropic
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+CLAUDE_MODEL = "claude-sonnet-5"
 
 # Notion
 NOTION_API_KEY = os.getenv("NOTION_API_KEY")
