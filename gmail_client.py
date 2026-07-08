@@ -121,6 +121,9 @@ def _html_to_text(html: str) -> str:
                          ('&#39;', "'"), ('&quot;', '"'), ('&mdash;', '—'), ('&ndash;', '–')]:
         html = html.replace(entity, char)
     html = re.sub(r'[ \t]+', ' ', html)
+    # Strip beehiiv image artifact lines and decorative separators
+    html = re.sub(r'^(View image|Follow image link|Caption):.*$', '', html, flags=re.MULTILINE | re.IGNORECASE)
+    html = re.sub(r'^\s*[-=]{5,}\s*$', '', html, flags=re.MULTILINE)
     html = re.sub(r'\n{3,}', '\n\n', html)
     return html.strip()
 

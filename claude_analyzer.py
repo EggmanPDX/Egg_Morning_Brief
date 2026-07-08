@@ -126,9 +126,10 @@ For each story, set "url" to the best-matching link above. Prefer the link whose
 text most closely matches the story headline. Use "" if no good match exists."""
 
     prompt = f"""You are summarizing a newsletter for Gregg Eiler's morning brief.
-Extract every distinct story, article, or insight from this issue, up to a maximum of 12.
-Include sponsored content and tutorials if they have real informational value. Don't pad
-to 12 if the issue only has 4-5 real stories — fewer, real stories beats padded filler.
+Extract every distinct story, article, tool, tutorial, or social/trending item from this newsletter, up to 12.
+This includes items in "In The Know", "Trending", "Tools", "Tutorials", "Insight", and "Coding Hack" sections —
+treat each bullet or named item as its own entry. Skip only pure ads with zero informational value.
+Don't pad to 12 if the newsletter genuinely has fewer real items.
 
 Newsletter: {newsletter['name']}
 Subject: {newsletter['subject']}
@@ -147,7 +148,7 @@ Be concrete. Name the actual topic, company, or finding. No vague summaries."""
     try:
         response = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=2000,
+            max_tokens=8000,  # sonnet-5 uses extended thinking; budget needed for thinking + JSON output
             messages=[{"role": "user", "content": prompt}],
         )
         raw = _response_text(response).strip()
