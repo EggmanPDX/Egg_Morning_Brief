@@ -269,13 +269,32 @@ def build_newsletter_digest_blocks(newsletter_results: dict, run_timestamp: str)
                                    "annotations": {"color": "gray"}}]
                 },
             })
-            blocks.append({
-                "object": "block",
-                "type": "paragraph",
-                "paragraph": {
-                    "rich_text": [{"type": "text", "text": {"content": result.get("summary", "")}}]
-                },
-            })
+            articles = result.get("articles") or []
+            # Fall back to legacy summary string if articles list is missing
+            if not articles and result.get("summary"):
+                articles = [
+                    {"headline": line.lstrip("• ").split(": ")[0],
+                     "gist": ": ".join(line.lstrip("• ").split(": ")[1:]),
+                     "url": ""}
+                    for line in result["summary"].split("\n") if line.strip()
+                ]
+            for article in articles:
+                headline = article.get("headline", "")
+                gist = article.get("gist", "")
+                url = article.get("url", "")
+                headline_run = {
+                    "type": "text",
+                    "text": {"content": headline, **({"link": {"url": url}} if url else {})},
+                    "annotations": {"bold": True},
+                }
+                sep_run = {"type": "text", "text": {"content": f": {gist}" if gist else ""}}
+                blocks.append({
+                    "object": "block",
+                    "type": "bulleted_list_item",
+                    "bulleted_list_item": {
+                        "rich_text": [headline_run, sep_run] if gist else [headline_run]
+                    },
+                })
 
     return blocks
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 import os
 import base64
+import re
 from datetime import datetime, timedelta
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -96,6 +97,37 @@ def _extract_body(payload):
     return body.strip()
 
 
+def _extract_html(payload) -> str:
+    """Extract HTML body from Gmail message payload."""
+    mime = payload.get("mimeType", "")
+    if mime == "text/html":
+        data = payload.get("body", {}).get("data", "")
+        if data:
+            return base64.urlsafe_b64decode(data).decode("utf-8", errors="ignore")
+    if "parts" in payload:
+        for part in payload["parts"]:
+            result = _extract_html(part)
+            if result:
+                return result
+    return ""
+
+
+def _extract_links_from_html(html: str) -> dict:
+    """Return {anchor_text: url} for all meaningful links in the HTML.
+    Skips mailto, fragment, and very short anchor texts."""
+    pairs = re.findall(
+        r'<a[^>]+href=["\']([^"\']+)["\'][^>]*>(.*?)</a>',
+        html, re.IGNORECASE | re.DOTALL
+    )
+    result = {}
+    for url, raw_text in pairs:
+        text = re.sub(r'<[^>]+>', '', raw_text)   # strip nested tags
+        text = re.sub(r'\s+', ' ', text).strip()
+        if len(text) >= 10 and not url.startswith(('mailto:', '#', 'javascript:')):
+            result[text] = url
+    return result
+
+
 def mark_as_read(service, message_id):
     """Mark a message as read after processing."""
     service.users().messages().modify(
@@ -141,6 +173,8 @@ def fetch_newsletter(service, name: str, sender_patterns: list, lookback_hours: 
 
             headers = {h["name"]: h["value"] for h in full_msg["payload"]["headers"]}
             body = _extract_body(full_msg["payload"])
+            html = _extract_html(full_msg["payload"])
+            links = _extract_links_from_html(html) if html else {}
 
             return {
                 "name": name,
@@ -148,6 +182,7 @@ def fetch_newsletter(service, name: str, sender_patterns: list, lookback_hours: 
                 "date": headers.get("Date", ""),
                 "sender": headers.get("From", pattern),
                 "body": body[:10000],  # cap for Claude — raised from 4000 so multi-story issues aren't cut off
+                "links": links,
             }
         except Exception as e:
             print(f"   ⚠️  Newsletter fetch error ({name} / {pattern}): {e}")

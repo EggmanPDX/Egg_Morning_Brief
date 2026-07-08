@@ -132,7 +132,7 @@ def main():
             # Summarize each found newsletter
             for name, result in raw_newsletters.items():
                 if result:
-                    result["summary"] = summarize_newsletter(result)
+                    result["articles"] = summarize_newsletter(result)
                 newsletter_results[name] = result
 
             update_newsletter_digest_on_briefing_page(newsletter_results, run_timestamp)

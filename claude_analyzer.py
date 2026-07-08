@@ -1,6 +1,7 @@
 # claude_analyzer.py
 import anthropic
 import json
+import re
 from config import ANTHROPIC_API_KEY, CLAUDE_MODEL, BUSINESS_CONTEXT
 
 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -103,14 +104,26 @@ def generate_gmail_digest(analyzed_emails: list) -> str:
     return "\n\n---\n\n".join(lines)
 
 
-def summarize_newsletter(newsletter: dict) -> str:
+def summarize_newsletter(newsletter: dict) -> list:
     """
-    Summarize a newsletter email into up to 7 stories for the Morning Brief / Mission
-    Control's Newsletter panel. Returns a plain-text string (one bullet per line, each
-    a story headline + a one-sentence gist) or an error note.
+    Summarize a newsletter email into up to 7 stories.
+    Returns a list of {headline, gist, url} dicts.
+    url is the best-matching link from the newsletter HTML, or "" if none found.
+    Falls back to a single-item error list on failure.
     """
     if not newsletter or not newsletter.get("body"):
-        return "No content available."
+        return [{"headline": "No content available.", "gist": "", "url": ""}]
+
+    links = newsletter.get("links", {})
+    links_section = ""
+    if links:
+        entries = "\n".join(f'  "{text}": "{url}"' for text, url in list(links.items())[:60])
+        links_section = f"""
+Available links extracted from the newsletter HTML (anchor text → URL):
+{entries}
+
+For each story, set "url" to the best-matching link above. Prefer the link whose anchor
+text most closely matches the story headline. Use "" if no good match exists."""
 
     prompt = f"""You are summarizing a newsletter for Gregg Eiler's morning brief.
 Extract every distinct story or insight from this issue, up to a maximum of 7. Don't pad
@@ -121,21 +134,27 @@ Subject: {newsletter['subject']}
 
 Body:
 {newsletter['body']}
+{links_section}
 
-Return ONLY bullet points in this exact format (no preamble, no extra text, no numbering):
-• [Story headline]: [one-sentence gist, ≤25 words]
+Return ONLY a JSON array, no preamble, no markdown fences:
+[
+  {{"headline": "Story headline", "gist": "One-sentence gist, ≤25 words.", "url": "https://..."}}
+]
 
 Be concrete. Name the actual topic, company, or finding. No vague summaries."""
 
     try:
         response = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=1200,
+            max_tokens=1500,
             messages=[{"role": "user", "content": prompt}],
         )
-        return _response_text(response).strip()
+        raw = _response_text(response).strip()
+        # Strip accidental markdown fences
+        raw = re.sub(r'^```[a-z]*\n?', '', raw).rstrip('`').strip()
+        return json.loads(raw)
     except Exception as e:
-        return f"[Summary error: {e}]"
+        return [{"headline": f"[Summary error: {e}]", "gist": "", "url": ""}]
 
 
 DESC_TRUNCATE = 600
