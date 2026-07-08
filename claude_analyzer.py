@@ -146,13 +146,25 @@ Be concrete. Name the actual topic, company, or finding. No vague summaries."""
     try:
         response = client.messages.create(
             model=CLAUDE_MODEL,
-            max_tokens=1500,
+            max_tokens=2000,
             messages=[{"role": "user", "content": prompt}],
         )
         raw = _response_text(response).strip()
-        # Strip accidental markdown fences
         raw = re.sub(r'^```[a-z]*\n?', '', raw).rstrip('`').strip()
-        return json.loads(raw)
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            # Salvage complete objects from a truncated or malformed array
+            objects = re.findall(r'\{[^{}]+\}', raw, re.DOTALL)
+            results = []
+            for obj in objects:
+                try:
+                    results.append(json.loads(obj))
+                except json.JSONDecodeError:
+                    pass
+            if results:
+                return results
+            raise
     except Exception as e:
         return [{"headline": f"[Summary error: {e}]", "gist": "", "url": ""}]
 
