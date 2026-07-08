@@ -126,8 +126,9 @@ For each story, set "url" to the best-matching link above. Prefer the link whose
 text most closely matches the story headline. Use "" if no good match exists."""
 
     prompt = f"""You are summarizing a newsletter for Gregg Eiler's morning brief.
-Extract every distinct story or insight from this issue, up to a maximum of 7. Don't pad
-to 7 if the issue only has 3-4 real stories — fewer, real stories beats padded filler.
+Extract every distinct story, article, or insight from this issue, up to a maximum of 12.
+Include sponsored content and tutorials if they have real informational value. Don't pad
+to 12 if the issue only has 4-5 real stories — fewer, real stories beats padded filler.
 
 Newsletter: {newsletter['name']}
 Subject: {newsletter['subject']}

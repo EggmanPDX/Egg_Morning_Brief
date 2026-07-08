@@ -112,6 +112,19 @@ def _extract_html(payload) -> str:
     return ""
 
 
+def _html_to_text(html: str) -> str:
+    """Strip HTML tags to readable plain text for newsletter content extraction."""
+    html = re.sub(r'<(script|style|head)[^>]*>.*?</\1>', '', html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r'<(?:br|/p|/div|/h[1-6]|/li|/tr|/td)[^>]*>', '\n', html, flags=re.IGNORECASE)
+    html = re.sub(r'<[^>]+>', '', html)
+    for entity, char in [('&amp;', '&'), ('&lt;', '<'), ('&gt;', '>'), ('&nbsp;', ' '),
+                         ('&#39;', "'"), ('&quot;', '"'), ('&mdash;', '—'), ('&ndash;', '–')]:
+        html = html.replace(entity, char)
+    html = re.sub(r'[ \t]+', ' ', html)
+    html = re.sub(r'\n{3,}', '\n\n', html)
+    return html.strip()
+
+
 def _extract_links_from_html(html: str) -> dict:
     """Return {anchor_text: url} for all meaningful links in the HTML.
     Skips mailto, fragment, and very short anchor texts."""
@@ -175,13 +188,16 @@ def fetch_newsletter(service, name: str, sender_patterns: list, lookback_hours: 
             body = _extract_body(full_msg["payload"])
             html = _extract_html(full_msg["payload"])
             links = _extract_links_from_html(html) if html else {}
+            # HTML-only newsletters have a thin or empty text/plain part; use stripped HTML instead
+            if len(body) < 500 and html:
+                body = _html_to_text(html)
 
             return {
                 "name": name,
                 "subject": headers.get("Subject", "(no subject)"),
                 "date": headers.get("Date", ""),
                 "sender": headers.get("From", pattern),
-                "body": body[:10000],  # cap for Claude — raised from 4000 so multi-story issues aren't cut off
+                "body": body[:20000],
                 "links": links,
             }
         except Exception as e:
